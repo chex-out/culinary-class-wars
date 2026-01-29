@@ -1,0 +1,12 @@
+{
+  "name": "culinary-class-wars",
+  "version": "1.0.0",
+  "description": "Culinary Class Wars Dinner Party Game",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vercel dev"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT"
+}

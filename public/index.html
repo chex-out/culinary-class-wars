@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Culinary Class Wars - Dinner Party Game</title>
+    <link rel="icon" href="https://brand.netflix.com/favicon.ico"/>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
+        
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+        }
+        
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .ingredient-card {
+            transition: all 0.3s ease;
+        }
+        
+        .ingredient-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-900 via-red-900 to-black min-h-screen text-white">
+    <div class="container mx-auto px-4 py-8 max-w-6xl">
+        <!-- Header -->
+        <div class="text-center mb-12">
+            <h1 class="text-5xl font-black mb-4 text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-yellow-500">
+                CULINARY CLASS WARS
+            </h1>
+            <p class="text-xl text-gray-300">흑백요리사 Dinner Party Challenge</p>
+        </div>
+
+        <!-- Setup Screen -->
+        <div id="setupScreen" class="space-y-8">
+            <div class="glass-effect rounded-2xl p-8">
+                <h2 class="text-3xl font-bold mb-6 text-yellow-400">Setup Contestants</h2>
+                
+                <div class="space-y-4 mb-6">
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Number of Contestants</label>
+                        <input type="number" id="numContestants" value="4" min="2" max="12" 
+                               class="w-full px-4 py-3 bg-gray-800 rounded-lg border border-gray-600 focus:border-red-500 focus:outline-none">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Number of "Bad" Ingredients to Assign</label>
+                        <input type="number" id="numBadIngredients" value="2" min="0" max="12" 
+                               class="w-full px-4 py-3 bg-gray-800 rounded-lg border border-gray-600 focus:border-red-500 focus:outline-none">
+                        <p class="text-xs text-gray-400 mt-1">Random contestants will receive one extra "bad" ingredient</p>
+                    </div>
+                </div>
+
+                <button onclick="assignIngredients()" 
+                        class="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-bold py-4 px-8 rounded-lg transition-all transform hover:scale-105">
+                    🎲 Assign Ingredients
+                </button>
+            </div>
+
+            <div id="assignmentsContainer" class="hidden">
+                <div class="glass-effect rounded-2xl p-8">
+                    <h2 class="text-3xl font-bold mb-6 text-yellow-400">Ingredient Assignments</h2>
+                    <div id="assignmentsList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+                </div>
+            </div>
+
+            <div class="text-center">
+                <button id="goToSubmissionBtn" onclick="goToSubmissions()" 
+                        class="hidden px-8 py-3 bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white font-bold rounded-lg transition-all transform hover:scale-105">
+                    Continue to Dish Submissions →
+                </button>
+            </div>
+        </div>
+
+        <!-- Submission Screen -->
+        <div id="submissionScreen" class="hidden space-y-8">
+            <button onclick="backToSetup()" 
+                    class="mb-4 px-6 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all">
+                ← Back to Setup
+            </button>
+
+            <!-- API Key Section -->
+            <div class="glass-effect rounded-2xl p-6 bg-yellow-900/20 border-yellow-600">
+                <h3 class="text-lg font-bold text-yellow-400 mb-3">🔑 API Key Required for Judging</h3>
+                <p class="text-sm text-gray-300 mb-3">
+                    To get AI-powered judging, you need an Anthropic API key. Get one at 
+                    <a href="https://console.anthropic.com/" target="_blank" class="text-yellow-400 underline">console.anthropic.com</a>
+                    (requires billing setup - minimum $5).
+                </p>
+                <input type="password" id="apiKey" placeholder="Enter your API key (sk-ant-...)" 
+                       class="w-full px-4 py-3 bg-gray-800 rounded-lg border border-yellow-600 focus:border-yellow-500 focus:outline-none">
+                <p class="text-xs text-gray-400 mt-2">
+                    Your key is sent via CORS proxy (corsproxy.io) to bypass browser restrictions. Each judgment costs ~$0.01-0.03.
+                </p>
+            </div>
+
+            <div class="glass-effect rounded-2xl p-8">
+                <h2 class="text-3xl font-bold mb-6 text-yellow-400">Submit Your Dish</h2>
+                
+                <div class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Select Contestant Slot</label>
+                        <select id="contestantSlot" onchange="updateIngredients()"
+                               class="w-full px-4 py-3 bg-gray-800 rounded-lg border border-gray-600 focus:border-red-500 focus:outline-none">
+                            <option value="">Select your contestant slot...</option>
+                        </select>
+                        <p class="text-xs text-gray-400 mt-1">This determines your ingredients</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Your Name</label>
+                        <input type="text" id="contestantName" placeholder="Enter your name"
+                               class="w-full px-4 py-3 bg-gray-800 rounded-lg border border-gray-600 focus:border-red-500 focus:outline-none">
+                        <p class="text-xs text-gray-400 mt-1">You can customize this after selecting your slot</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Your Ingredients</label>
+                        <textarea id="dishIngredients" placeholder="Select your contestant slot first..."
+                                  class="w-full px-4 py-3 bg-gray-800 rounded-lg border border-gray-600 focus:border-red-500 focus:outline-none h-24" readonly></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Dish Name</label>
+                        <input type="text" id="dishName" placeholder="What's your dish called?"
+                               class="w-full px-4 py-3 bg-gray-800 rounded-lg border border-gray-600 focus:border-red-500 focus:outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Dish Description</label>
+                        <textarea id="dishDescription" placeholder="Describe your dish, cooking techniques, flavors, presentation..."
+                                  class="w-full px-4 py-3 bg-gray-800 rounded-lg border border-gray-600 focus:border-red-500 focus:outline-none h-32"></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Upload Dish Image/Drawing</label>
+                        <input type="file" id="dishImage" accept="image/*"
+                               class="w-full px-4 py-3 bg-gray-800 rounded-lg border border-gray-600 focus:border-red-500 focus:outline-none">
+                        <p class="text-xs text-gray-400 mt-1">Upload a photo or drawing of your dish</p>
+                    </div>
+
+                    <button onclick="addSubmission()" 
+                            class="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold py-4 px-8 rounded-lg transition-all transform hover:scale-105">
+                        ✓ Add My Dish to Queue
+                    </button>
+                </div>
+            </div>
+
+            <div id="submittedDishesContainer" class="hidden glass-effect rounded-2xl p-8">
+                <h2 class="text-3xl font-bold mb-6 text-yellow-400">Submitted Dishes</h2>
+                <div id="submittedDishesList" class="space-y-4 mb-6"></div>
+                
+                <button onclick="judgeAllDishes()" 
+                        class="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-bold py-4 px-8 rounded-lg transition-all transform hover:scale-105">
+                        🔥 Judge All Dishes Now!
+                </button>
+            </div>
+        </div>
+
+        <!-- Results Screen -->
+        <div id="resultsScreen" class="hidden space-y-8">
+            <button onclick="backToSubmissions()" 
+                    class="mb-4 px-6 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all">
+                ← Back to Submissions
+            </button>
+
+            <div id="loadingState" class="hidden glass-effect rounded-2xl p-8 text-center">
+                <div class="mb-4 flex justify-center">
+                    <img src="https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExbms0dzRoaGxieHdzcnB2cHZyYTBldGlnem9nOG54emdjdDh1bzRjcyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/LfDyOYy3gjlMPbL8Ch/giphy.gif" 
+                         alt="Judges tasting" 
+                         class="rounded-lg shadow-lg"
+                         style="max-height: 400px; max-width: 100%; height: auto; width: auto;"
+                         onload="document.getElementById('fallbackSpinner').style.display='none';"
+                         onerror="this.style.display='none'; document.getElementById('fallbackSpinner').style.display='inline-block';">
+                </div>
+                <div id="fallbackSpinner" class="mb-4 flex justify-center">
+                    <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-400"></div>
+                </div>
+                <p class="mt-4 text-gray-300 text-lg">The judges are evaluating all dishes...</p>
+                <p class="mt-2 text-gray-400 text-sm">This may take a moment...</p>
+            </div>
+
+            <div id="allJudgments" class="space-y-6"></div>
+        </div>
+    </div>
+
+    <script>
+        const proteinIngredients = [
+            "Alaskan King Crab", "A5 Miyazaki Beef", "Bluefin Tuna", "Japanese Scallops",
+            "Wild Salmon", "Duck Breast", "Lobster Tail", "Foie Gras", "Uni (Sea Urchin)",
+            "Korean A1 Hanwoo (Beef)", "Pork Tenderloin", "Kurobuta Pork Belly", 
+            "Lamb Rack", "Whole Chicken", "Prosciutto di Parma", "Beluga Caviar"
+        ];
+
+        const nonProteinIngredients = [
+            "Black Truffle", "White Alba Truffle", "Bone Marrow",
+            "Porcini Mushrooms", "Aged Parmesan", "San Marzano Tomatoes", 
+            "Saffron", "Doenjang", "Yuzu", "Miso Paste", "Gochujang", 
+            "Kombu Seaweed", "Shiso Leaves", "Korean Pear", "Fresh Burrata", 
+            "Extra Virgin Olive Oil", "Fresh Basil", 
+            "Heirloom Tomatoes", "King Oyster Mushrooms", "Shiitake Mushrooms", 
+            "Sesame Oil", "Perilla Oil", "Fresh Figs", "Pomegranate", "Blood Orange"
+        ];
+
+        const badIngredients = [
+            "Durian", "Natto (Fermented Soybeans)", "Century Egg", "Chicken Feet", "Sea Cucumber",
+            "Blue Cheese (Extra Strong)", "Coriander", "Freshly Grated Wasabi", "Rose Syrup", "Black Garlic",
+            "Bitter Melon", "Chicken Liver", "Beef Tongue", "Tripe", "Gingko",
+            "Stinky Tofu", "Fish Sauce"
+        ];
+
+        let assignments = [];
+        let submissions = [];
+
+        function shuffleArray(array) {
+            const newArray = [...array];
+            for (let i = newArray.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+            }
+            return newArray;
+        }
+
+        function assignIngredients() {
+            const numContestants = parseInt(document.getElementById('numContestants').value);
+            const numBadIngredients = parseInt(document.getElementById('numBadIngredients').value);
+
+            assignments = [];
+            submissions = [];
+            const shuffledProteins = shuffleArray(proteinIngredients);
+            const shuffledNonProteins = shuffleArray(nonProteinIngredients);
+            const shuffledBad = shuffleArray(badIngredients);
+            
+            const badIngredientRecipients = shuffleArray([...Array(numContestants).keys()])
+                .slice(0, numBadIngredients);
+
+            for (let i = 0; i < numContestants; i++) {
+                // Each contestant gets 1 protein + 1 non-protein
+                const protein = shuffledProteins[i % shuffledProteins.length];
+                const nonProtein = shuffledNonProteins[i % shuffledNonProteins.length];
+                
+                const assignment = {
+                    contestant: `Contestant ${i + 1}`,
+                    goodIngredients: [protein, nonProtein],
+                    badIngredient: badIngredientRecipients.includes(i) ? shuffledBad[badIngredientRecipients.indexOf(i)] : null
+                };
+                
+                assignments.push(assignment);
+            }
+
+            displayAssignments();
+        }
+
+        function displayAssignments() {
+            const container = document.getElementById('assignmentsList');
+            container.innerHTML = assignments.map((a) => `
+                <div class="ingredient-card bg-gray-800 rounded-xl p-6 border-2 ${a.badIngredient ? 'border-red-500' : 'border-gray-700'}">
+                    <h3 class="text-xl font-bold mb-4 ${a.badIngredient ? 'text-red-400' : 'text-yellow-400'}">
+                        ${a.contestant}
+                    </h3>
+                    
+                    <div class="mb-3">
+                        <p class="text-sm font-semibold text-green-400 mb-2">✓ Good Ingredients:</p>
+                        <ul class="space-y-1">
+                            ${a.goodIngredients.map(ing => `<li class="text-sm text-gray-300">• ${ing}</li>`).join('')}
+                        </ul>
+                    </div>
+                    
+                    ${a.badIngredient ? `
+                        <div class="mt-3 pt-3 border-t border-gray-700">
+                            <p class="text-sm font-semibold text-red-400 mb-2">⚠ Bad Ingredient:</p>
+                            <p class="text-sm text-red-300 font-semibold">• ${a.badIngredient}</p>
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('');
+
+            document.getElementById('assignmentsContainer').classList.remove('hidden');
+            document.getElementById('goToSubmissionBtn').classList.remove('hidden');
+        }
+
+        function goToSubmissions() {
+            document.getElementById('setupScreen').classList.add('hidden');
+            document.getElementById('submissionScreen').classList.remove('hidden');
+            
+            const dropdown = document.getElementById('contestantSlot');
+            dropdown.innerHTML = '<option value="">Select your contestant slot...</option>';
+            assignments.forEach((assignment, idx) => {
+                const option = document.createElement('option');
+                option.value = idx;
+                option.textContent = assignment.contestant;
+                dropdown.appendChild(option);
+            });
+            
+            updateSubmittedDishesDisplay();
+            window.scrollTo(0, 0);
+        }
+
+        function updateIngredients() {
+            const dropdown = document.getElementById('contestantSlot');
+            const selectedIndex = dropdown.value;
+            
+            if (selectedIndex === '') {
+                document.getElementById('dishIngredients').value = '';
+                document.getElementById('contestantName').value = '';
+                return;
+            }
+            
+            const assignment = assignments[selectedIndex];
+            
+            // Auto-fill the name field with the contestant slot name
+            document.getElementById('contestantName').value = assignment.contestant;
+            
+            // Fill ingredients
+            let ingredientText = 'Good Ingredients:\n';
+            ingredientText += assignment.goodIngredients.map(ing => `• ${ing}`).join('\n');
+            
+            if (assignment.badIngredient) {
+                ingredientText += '\n\nBad Ingredient:\n';
+                ingredientText += `• ${assignment.badIngredient}`;
+            }
+            
+            document.getElementById('dishIngredients').value = ingredientText;
+        }
+
+        async function addSubmission() {
+            const contestantSlot = document.getElementById('contestantSlot');
+            const selectedIndex = contestantSlot.value;
+            const contestantName = document.getElementById('contestantName').value.trim();
+            const dishIngredients = document.getElementById('dishIngredients').value;
+            const dishName = document.getElementById('dishName').value;
+            const dishDescription = document.getElementById('dishDescription').value;
+            const dishImageInput = document.getElementById('dishImage');
+
+            if (selectedIndex === '' || !contestantName || !dishName || !dishDescription) {
+                alert('Please fill in all required fields (contestant slot, name, dish name, and description)');
+                return;
+            }
+
+            if (submissions.find(s => s.contestantIndex === parseInt(selectedIndex))) {
+                if (!confirm('This contestant slot has already submitted. Do you want to replace their submission?')) {
+                    return;
+                }
+                submissions = submissions.filter(s => s.contestantIndex !== parseInt(selectedIndex));
+            }
+
+            let imageData = null;
+            let imageMimeType = null;
+            if (dishImageInput.files.length > 0) {
+                const file = dishImageInput.files[0];
+                imageMimeType = file.type;
+                imageData = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve(e.target.result.split(',')[1]);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            submissions.push({
+                contestantIndex: parseInt(selectedIndex),
+                contestantName,
+                dishIngredients,
+                dishName,
+                dishDescription,
+                imageData,
+                imageMimeType
+            });
+
+            document.getElementById('contestantSlot').value = '';
+            document.getElementById('contestantName').value = '';
+            document.getElementById('dishIngredients').value = '';
+            document.getElementById('dishName').value = '';
+            document.getElementById('dishDescription').value = '';
+            document.getElementById('dishImage').value = '';
+
+            updateSubmittedDishesDisplay();
+            alert(`✓ ${contestantName}'s dish has been added! (${submissions.length}/${assignments.length} submitted)`);
+        }
+
+        function updateSubmittedDishesDisplay() {
+            const container = document.getElementById('submittedDishesList');
+            const containerDiv = document.getElementById('submittedDishesContainer');
+            
+            if (submissions.length === 0) {
+                containerDiv.classList.add('hidden');
+                return;
+            }
+
+            containerDiv.classList.remove('hidden');
+            container.innerHTML = submissions.map((sub, idx) => `
+                <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                    <div class="flex justify-between items-start">
+                        <div class="flex-1">
+                            <h4 class="font-bold text-yellow-400">${sub.contestantName}</h4>
+                            <p class="text-sm text-gray-300 mt-1">${sub.dishName}</p>
+                        </div>
+                        <button onclick="removeSubmission(${idx})" 
+                                class="ml-4 px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm rounded transition-all">
+                            Remove
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function removeSubmission(index) {
+            if (confirm('Remove this submission?')) {
+                submissions.splice(index, 1);
+                updateSubmittedDishesDisplay();
+            }
+        }
+
+        async function judgeAllDishes() {
+            if (submissions.length === 0) {
+                alert('No dishes have been submitted yet!');
+                return;
+            }
+
+            const apiKey = document.getElementById('apiKey').value.trim();
+            if (!apiKey || !apiKey.startsWith('sk-ant-')) {
+                alert('Please enter a valid Anthropic API key (starts with sk-ant-) in the API Key field above.');
+                return;
+            }
+
+            document.getElementById('submissionScreen').classList.add('hidden');
+            document.getElementById('resultsScreen').classList.remove('hidden');
+            document.getElementById('loadingState').classList.remove('hidden');
+            document.getElementById('allJudgments').innerHTML = '';
+            window.scrollTo(0, 0);
+
+            try {
+                // Sort submissions so Michelle is judged last
+                const sortedSubmissions = [...submissions].sort((a, b) => {
+                    const aHasMichelle = a.contestantName.toLowerCase().includes('michelle');
+                    const bHasMichelle = b.contestantName.toLowerCase().includes('michelle');
+                    if (aHasMichelle && !bHasMichelle) return 1;
+                    if (!aHasMichelle && bHasMichelle) return -1;
+                    return 0;
+                });
+
+                const judgmentPromises = sortedSubmissions.map(async (sub) => {
+                    const isMichelle = sub.contestantName.toLowerCase().includes('michelle');
+                    
+                    const content = [
+                        ...(sub.imageData ? [{
+                            type: "image",
+                            source: {
+                                type: "base64",
+                                media_type: sub.imageMimeType,
+                                data: sub.imageData
+                            }
+                        }] : []),
+                        {
+                            type: "text",
+                            text: `You are the judging panel from Culinary Class Wars (흑백요리사). Provide feedback as both Paik Jong Won and Anh Sung Jae with their DISTINCT personalities.
+
+**Contestant:** ${sub.contestantName}
+**Dish Name:** ${sub.dishName}
+**Ingredients:** ${sub.dishIngredients}
+**Description:** ${sub.dishDescription}
+
+${isMichelle ? `
+🎂 SPECIAL BIRTHDAY NOTE: This is ${sub.contestantName}'s birthday! After your normal judging, BOTH judges must add a warm, personal "Happy Birthday" message in their own distinct voices. Keep it heartfelt but brief (1-2 sentences each).
+` : ''}
+
+CRITICAL CONSTRAINTS:
+- Total feedback must be 250 words or less
+- Each judge has VERY different feedback styles - capture their personalities
+- Be concise and impactful
+
+**Paik Jong Won (백종원)** (80-100 words): 
+- MORE LENIENT and encouraging - finds positives even in flawed dishes
+- Folksy, down-to-earth, focuses on practical cooking and everyday appeal
+- Emphasizes flavor balance, proper seasoning, and "does it taste good?"
+- Often scores 7-9/10, rarely goes below 6 unless truly problematic
+- Warm tone: "이건 괜찮은데?" (This is pretty good!), "맛있어요" (It's delicious)
+- Score: Typically 7-9/10
+
+**Anh Sung Jae (안성재)** (80-100 words):
+- MORE CRITICAL and exacting with higher standards from fine dining background
+- Refined, technical, focuses on sophistication and precision
+- Emphasizes presentation, creativity, technique refinement, and modern execution
+- When giving COMPLIMENTS, he specifically praises: "perfect doneness on the protein", "even cooking throughout", "precise vegetable preparation"
+- When critiquing, he focuses on creativity, plating, flavor complexity, or refinement - NOT doneness issues
+- Scores more harshly - often 5-7/10, gives 8+ only for exceptional work
+- Direct, professional tone with constructive criticism
+- Points out what's missing or could be elevated
+- Score: Typically 5-7/10
+
+Make the scoring difference clear - Paik is the generous one, Anh is the tough critic who notices technical execution details (especially when praising them).`
+                        }
+                    ];
+
+                    const requestBody = JSON.stringify({
+                        model: "claude-sonnet-4-20250514",
+                        max_tokens: 2000,
+                        messages: [{ role: "user", content }]
+                    });
+
+                    // Use Vercel serverless function
+                    // When deployed: uses /api/judge
+                    // For local testing: use your Vercel dev URL
+                    const apiUrl = '/api/judge';
+                    
+                    console.log('Calling Vercel serverless function...');
+                    
+                    const response = await fetch(apiUrl, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "x-api-key": apiKey
+                        },
+                        body: requestBody
+                    });
+
+                    console.log(`Response status: ${response.status}`);
+
+                    if (!response.ok) {
+                        let errorMessage = `API Error (${response.status})`;
+                        try {
+                            const errorData = await response.json();
+                            console.error('API Error Details:', errorData);
+                            
+                            if (errorData.error?.type === 'authentication_error') {
+                                errorMessage = 'Authentication failed. Please check your API key is correct.';
+                            } else if (errorData.error?.type === 'permission_error') {
+                                errorMessage = 'Permission denied. Your API key may not have access to this model.';
+                            } else if (errorData.error?.type === 'invalid_request_error') {
+                                errorMessage = 'Invalid request: ' + (errorData.error?.message || 'Unknown error');
+                            } else if (response.status === 429) {
+                                errorMessage = 'Rate limit exceeded. Please wait a moment and try again.';
+                            } else if (response.status === 402) {
+                                errorMessage = 'Insufficient credits. Please add credits to your Anthropic account at console.anthropic.com';
+                            } else {
+                                errorMessage = errorData.error?.message || errorMessage;
+                            }
+                        } catch (e) {
+                            console.error('Could not parse error:', e);
+                        }
+                        throw new Error(errorMessage);
+                    }
+
+                    const data = await response.json();
+                    const judgment = data.content.find(c => c.type === 'text')?.text || 'Unable to get judgment';
+                    
+                    console.log('Successfully got judgment');
+                    
+                    return {
+                        contestantName: sub.contestantName,
+                        dishName: sub.dishName,
+                        judgment,
+                        isMichelle
+                    };
+                });
+
+                const results = await Promise.all(judgmentPromises);
+
+                document.getElementById('loadingState').classList.add('hidden');
+
+                const resultsContainer = document.getElementById('allJudgments');
+                resultsContainer.innerHTML = results.map((result, idx) => `
+                    <div class="glass-effect rounded-2xl p-8 animate-fade-in ${result.isMichelle ? 'border-2 border-yellow-400' : ''}" style="animation-delay: ${idx * 0.1}s">
+                        <h3 class="text-2xl font-bold text-yellow-400 mb-2">${result.contestantName}${result.isMichelle ? ' 🎂' : ''}</h3>
+                        <p class="text-lg text-gray-300 mb-4 italic">"${result.dishName}"</p>
+                        <div class="bg-gray-800 rounded-xl p-6 prose prose-invert max-w-none">
+                            ${result.judgment.split('\n').map(line => {
+                                if (line.includes('Paik Jong Won') || line.includes('백종원')) {
+                                    return `<h4 class="text-red-400 font-bold text-xl mt-6 mb-3">${line}</h4>`;
+                                } else if (line.includes('Anh Sung Jae') || line.includes('안성재')) {
+                                    return `<h4 class="text-blue-400 font-bold text-xl mt-6 mb-3">${line}</h4>`;
+                                } else if (line.trim().startsWith('-') || line.trim().startsWith('•')) {
+                                    return `<p class="ml-4 mb-2">${line}</p>`;
+                                } else if (line.trim()) {
+                                    return `<p class="mb-3">${line}</p>`;
+                                }
+                                return '';
+                            }).join('')}
+                        </div>
+                    </div>
+                `).join('');
+
+            } catch (error) {
+                document.getElementById('loadingState').classList.add('hidden');
+                
+                let userMessage = 'Error getting judgments:\n\n' + error.message;
+                
+                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                    userMessage += '\n\n⚠️ TROUBLESHOOTING STEPS:\n\n';
+                    userMessage += '1. CHECK YOUR API KEY:\n';
+                    userMessage += '   - Go to console.anthropic.com\n';
+                    userMessage += '   - Make sure you have billing set up\n';
+                    userMessage += '   - Verify your API key is active\n\n';
+                    userMessage += '2. OPEN BROWSER CONSOLE (F12):\n';
+                    userMessage += '   - Look for detailed error messages\n';
+                    userMessage += '   - Check which proxy failed\n\n';
+                    userMessage += '3. TRY AGAIN:\n';
+                    userMessage += '   - Sometimes proxies are temporarily down\n';
+                    userMessage += '   - Wait 30 seconds and retry\n\n';
+                    userMessage += '4. ALTERNATIVE:\n';
+                    userMessage += '   - Download the HTML file\n';
+                    userMessage += '   - Open it locally (file:///)\n';
+                    userMessage += '   - This bypasses some CORS issues';
+                } else if (error.message.includes('credits')) {
+                    userMessage += '\n\n💳 Please visit console.anthropic.com to add credits to your account.';
+                } else if (error.message.includes('Authentication')) {
+                    userMessage += '\n\n🔑 Your API key appears to be invalid. Please:\n';
+                    userMessage += '1. Go to console.anthropic.com\n';
+                    userMessage += '2. Generate a new API key\n';
+                    userMessage += '3. Copy it carefully (starts with sk-ant-)';
+                }
+                
+                alert(userMessage);
+                console.error('Full error:', error);
+                console.error('Error stack:', error.stack);
+            }
+        }
+
+        function backToSetup() {
+            document.getElementById('setupScreen').classList.remove('hidden');
+            document.getElementById('submissionScreen').classList.add('hidden');
+            document.getElementById('resultsScreen').classList.add('hidden');
+            window.scrollTo(0, 0);
+        }
+
+        function backToSubmissions() {
+            document.getElementById('submissionScreen').classList.remove('hidden');
+            document.getElementById('resultsScreen').classList.add('hidden');
+            window.scrollTo(0, 0);
+        }
+    </script>
+</body>
+</html>
