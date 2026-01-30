@@ -198,7 +198,30 @@
             </div>
 
             <div id="allJudgments" class="space-y-6"></div>
+            
+            <!-- Export and Share Buttons -->
+            <div id="exportButtons" class="hidden mt-8 flex flex-wrap gap-4 justify-center">
+                <button onclick="exportResultsPDF()" 
+                        class="px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold rounded-lg transition-all transform hover:scale-105">
+                    📄 Export Results as PDF
+                </button>
+                <button onclick="generateWinnerStory()" 
+                        class="px-8 py-3 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white font-bold rounded-lg transition-all transform hover:scale-105">
+                    📸 Generate Winner Story
+                </button>
+            </div>
         </div>
+        
+        <!-- Winner Story Canvas (hidden) -->
+        <canvas id="winnerCanvas" width="1080" height="1920" style="display: none;"></canvas>
+        
+        <!-- Audio elements -->
+        <audio id="judgingSound" loop>
+            <source src="https://cdn.pixabay.com/audio/2022/03/10/audio_0d0e0d944d.mp3" type="audio/mpeg">
+        </audio>
+        <audio id="applauseSound">
+            <source src="https://cdn.pixabay.com/audio/2022/03/24/audio_9c458c26f7.mp3" type="audio/mpeg">
+        </audio>
     </div>
 
     <script>
@@ -446,6 +469,11 @@
             document.getElementById('allJudgments').innerHTML = '';
             window.scrollTo(0, 0);
 
+            // Play dramatic judging sound
+            const judgingSound = document.getElementById('judgingSound');
+            judgingSound.volume = 0.3;
+            judgingSound.play().catch(e => console.log('Audio play failed:', e));
+
             try {
                 // Sort submissions so Michelle is judged last
                 const sortedSubmissions = [...submissions].sort((a, b) => {
@@ -579,6 +607,11 @@ Make the scoring difference clear - Paik is the generous one, Anh is the tough c
 
                 const results = await Promise.all(judgmentPromises);
 
+                // Stop judging sound
+                const judgingSound = document.getElementById('judgingSound');
+                judgingSound.pause();
+                judgingSound.currentTime = 0;
+
                 document.getElementById('loadingState').classList.add('hidden');
 
                 const resultsContainer = document.getElementById('allJudgments');
@@ -664,6 +697,130 @@ Make the scoring difference clear - Paik is the generous one, Anh is the tough c
             document.getElementById('submissionScreen').classList.remove('hidden');
             document.getElementById('resultsScreen').classList.add('hidden');
             window.scrollTo(0, 0);
+        }
+
+        // PDF Export Function
+        function exportResultsPDF() {
+            // Create a simple text-based PDF content
+            const judgments = document.getElementById('allJudgments').innerText;
+            const blob = new Blob([judgments], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'culinary-class-wars-results.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            alert('Results exported! Note: For a formatted PDF, you can print this page to PDF (Ctrl/Cmd + P)');
+        }
+
+        // Instagram Story Generator
+        function generateWinnerStory() {
+            if (!window.winnerData) {
+                alert('No winner data available. Please reveal rankings first.');
+                return;
+            }
+
+            const canvas = document.getElementById('winnerCanvas');
+            const ctx = canvas.getContext('2d');
+
+            // Background gradient
+            const gradient = ctx.createLinearGradient(0, 0, 0, 1920);
+            gradient.addColorStop(0, '#1a1a1a');
+            gradient.addColorStop(0.5, '#991b1b');
+            gradient.addColorStop(1, '#000000');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 1080, 1920);
+
+            // Title
+            ctx.fillStyle = '#fbbf24';
+            ctx.font = 'bold 100px "Noto Sans KR", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('CULINARY CLASS WARS', 540, 200);
+
+            ctx.font = 'bold 80px "Noto Sans KR", sans-serif';
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText('흑백요리사', 540, 300);
+
+            // Trophy
+            ctx.font = '200px Arial';
+            ctx.fillText('🏆', 540, 550);
+
+            // Winner text
+            ctx.font = 'bold 90px "Noto Sans KR", sans-serif';
+            ctx.fillStyle = '#fbbf24';
+            ctx.fillText('WINNER', 540, 700);
+
+            // Winner name
+            ctx.font = 'bold 110px "Noto Sans KR", sans-serif';
+            ctx.fillStyle = '#ffffff';
+            const name = window.winnerData.name;
+            if (name.length > 15) {
+                ctx.font = 'bold 80px "Noto Sans KR", sans-serif';
+            }
+            ctx.fillText(name, 540, 850);
+
+            // Dish name
+            ctx.font = 'italic 70px "Noto Sans KR", sans-serif';
+            ctx.fillStyle = '#d1d5db';
+            const dishName = `"${window.winnerData.dishName}"`;
+            // Wrap text if too long
+            const maxWidth = 950;
+            const words = dishName.split(' ');
+            let line = '';
+            let y = 980;
+            
+            for (let word of words) {
+                const testLine = line + word + ' ';
+                const metrics = ctx.measureText(testLine);
+                if (metrics.width > maxWidth && line !== '') {
+                    ctx.fillText(line, 540, y);
+                    line = word + ' ';
+                    y += 80;
+                } else {
+                    line = testLine;
+                }
+            }
+            ctx.fillText(line, 540, y);
+
+            // Scores
+            const scoreY = y + 180;
+            ctx.font = 'bold 65px "Noto Sans KR", sans-serif';
+            
+            // Paik score
+            ctx.fillStyle = '#ef4444';
+            ctx.fillText(`Paik: ${window.winnerData.paikScore}/10`, 350, scoreY);
+            
+            // Anh score
+            ctx.fillStyle = '#3b82f6';
+            ctx.fillText(`Anh: ${window.winnerData.anhScore}/10`, 730, scoreY);
+
+            // Average score
+            ctx.font = 'bold 90px "Noto Sans KR", sans-serif';
+            ctx.fillStyle = '#fbbf24';
+            ctx.fillText(`${window.winnerData.averageScore.toFixed(1)}/10`, 540, scoreY + 150);
+
+            // Date
+            ctx.font = '50px "Noto Sans KR", sans-serif';
+            ctx.fillStyle = '#9ca3af';
+            const date = new Date().toLocaleDateString();
+            ctx.fillText(date, 540, 1800);
+
+            // Convert to image and download
+            canvas.toBlob(function(blob) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'culinary-class-wars-winner.png';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+
+            alert('🎉 Winner story generated! Perfect for Instagram Stories (1080x1920)');
         }
 
         async function revealFinalRankings() {
@@ -773,6 +930,11 @@ Keep it under 100 words. Show their different perspectives but reach consensus o
                 // Remove loading indicator
                 document.getElementById('rankingsLoading').remove();
 
+                // Play applause sound
+                const applauseSound = document.getElementById('applauseSound');
+                applauseSound.volume = 0.4;
+                applauseSound.play().catch(e => console.log('Audio play failed:', e));
+
                 // Build rankings display
                 let rankingsHTML = `
                     <div class="text-center mb-6">
@@ -830,6 +992,18 @@ Keep it under 100 words. Show their different perspectives but reach consensus o
                 rankingsSection.className = 'glass-effect rounded-2xl p-8 mt-8 animate-fade-in border-4 border-yellow-500';
                 rankingsSection.innerHTML = rankingsHTML;
                 document.getElementById('allJudgments').appendChild(rankingsSection);
+
+                // Show export buttons
+                document.getElementById('exportButtons').classList.remove('hidden');
+
+                // Store winner data globally for sharing
+                window.winnerData = {
+                    name: top3[0].contestantName,
+                    dishName: top3[0].dishName,
+                    paikScore: top3[0].paikScore,
+                    anhScore: top3[0].anhScore,
+                    averageScore: top3[0].averageScore
+                };
 
                 // Scroll to rankings
                 rankingsSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
