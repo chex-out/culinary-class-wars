@@ -216,11 +216,8 @@
         <canvas id="winnerCanvas" width="1080" height="1920" style="display: none;"></canvas>
         
         <!-- Audio elements -->
-        <audio id="judgingSound" loop>
-            <source src="https://cdn.pixabay.com/audio/2022/03/10/audio_0d0e0d944d.mp3" type="audio/mpeg">
-        </audio>
         <audio id="applauseSound">
-            <source src="https://cdn.pixabay.com/audio/2022/03/24/audio_9c458c26f7.mp3" type="audio/mpeg">
+            <source src="/audio/applause.wav" type="audio/wav">
         </audio>
     </div>
 
@@ -469,11 +466,6 @@
             document.getElementById('allJudgments').innerHTML = '';
             window.scrollTo(0, 0);
 
-            // Play dramatic judging sound
-            const judgingSound = document.getElementById('judgingSound');
-            judgingSound.volume = 0.3;
-            judgingSound.play().catch(e => console.log('Audio play failed:', e));
-
             try {
                 // Sort submissions so Michelle is judged last
                 const sortedSubmissions = [...submissions].sort((a, b) => {
@@ -507,39 +499,37 @@
 
 ${isMichelle ? `
 🎂 SPECIAL BIRTHDAY NOTE: This is ${sub.contestantName}'s birthday! 
-- Be MORE LENIENT: Add 0.5-1 point to your normal scores (so Paik might give 8-10/10, Anh might give 6-8/10)
+- Be MORE LENIENT with your internal assessment
 - SEAMLESS BIRTHDAY WISHES: At the END of your normal feedback, naturally weave in a warm birthday wish as your concluding thought. Make it feel like a natural part of wrapping up your judgment, not a separate section. Keep it brief (1 sentence) and in your distinct voice.
   - Paik: Warm, folksy birthday wish ("And on your special day..." / "Happy birthday! 생일 축하해요...")
   - Anh: Elegant, refined birthday wish ("A fitting celebration for your birthday..." / "Happy birthday...")
 ` : ''}
 
 CRITICAL CONSTRAINTS:
-- Total feedback must be 250 words or less
+- Total feedback must be 200 words or less
 - Each judge has VERY different feedback styles - capture their personalities
+- DO NOT INCLUDE ANY NUMERICAL SCORES in your feedback
+- Focus on the qualitative assessment only
 - Be concise and impactful
 
 **Paik Jong Won (백종원)** (80-100 words): 
 - MORE LENIENT and encouraging - finds positives even in flawed dishes
 - Folksy, down-to-earth, focuses on practical cooking and everyday appeal
 - Emphasizes flavor balance, proper seasoning, and "does it taste good?"
-- Scores with precision: use whole numbers (6.0, 7.0, 8.0) or half points (6.5, 7.5, 8.5) as appropriate
-- Range: Usually 6.5-9.5/10, can go as low as 5.5 for poor execution or as high as 10.0 for exceptional
 - LANGUAGE: Write primarily in ENGLISH with occasional Korean quips for flavor (e.g., "이건 괜찮은데?" "맛있어요!" "생일 축하해요"). Keep Korean to SHORT phrases only - the bulk of feedback must be in English.
 - Warm tone with practical observations
-- Show variance - not all dishes should get similar scores
+- NO SCORES - just feedback
 
 **Anh Sung Jae (안성재)** (80-100 words):
 - MORE CRITICAL and exacting with higher standards from fine dining background
 - Refined, technical, focuses on sophistication and precision
 - Emphasizes presentation, creativity, technique refinement, and modern execution
-- Scores with precision: use whole numbers (5.0, 6.0, 7.0) or half points (5.5, 6.5, 7.5) as appropriate
-- Range: Usually 4.5-7.5/10, gives 8.0+ only for truly exceptional work, can go as low as 4.0 for poor dishes
 - When giving COMPLIMENTS, he specifically praises: "perfect doneness on the protein", "even cooking throughout", "precise vegetable preparation"
 - When critiquing, he focuses on creativity, plating, flavor complexity, or refinement - NOT doneness issues
 - Direct, professional tone with constructive criticism
-- Show variance - differentiate between dishes clearly with different scores
+- NO SCORES - just feedback
 
-Make the scoring difference clear - Paik is the generous one, Anh is the tough critic who notices technical execution details (especially when praising them). VARY THE SCORES - some dishes should be better than others!`
+Provide thoughtful feedback that shows the difference in their perspectives, but DO NOT include any numerical scores like "8/10" or ratings.`
                         }
                     ];
 
@@ -600,6 +590,7 @@ Make the scoring difference clear - Paik is the generous one, Anh is the tough c
                     return {
                         contestantName: sub.contestantName,
                         dishName: sub.dishName,
+                        dishDescription: sub.dishDescription,
                         judgment,
                         isMichelle
                     };
@@ -607,18 +598,14 @@ Make the scoring difference clear - Paik is the generous one, Anh is the tough c
 
                 const results = await Promise.all(judgmentPromises);
 
-                // Stop judging sound
-                const judgingSound = document.getElementById('judgingSound');
-                judgingSound.pause();
-                judgingSound.currentTime = 0;
-
                 document.getElementById('loadingState').classList.add('hidden');
 
                 const resultsContainer = document.getElementById('allJudgments');
                 resultsContainer.innerHTML = results.map((result, idx) => `
                     <div class="glass-effect rounded-2xl p-8 animate-fade-in ${result.isMichelle ? 'border-2 border-yellow-400' : ''}" style="animation-delay: ${idx * 0.1}s">
                         <h3 class="text-2xl font-bold text-yellow-400 mb-2">${result.contestantName}${result.isMichelle ? ' 🎂' : ''}</h3>
-                        <p class="text-lg text-gray-300 mb-4 italic">"${result.dishName}"</p>
+                        <p class="text-lg text-gray-300 mb-2 italic">"${result.dishName}"</p>
+                        <p class="text-sm text-gray-400 mb-4">${result.dishDescription}</p>
                         <div class="bg-gray-800 rounded-xl p-6 prose prose-invert max-w-none">
                             ${result.judgment.split('\n').map(line => {
                                 if (line.includes('Paik Jong Won') || line.includes('백종원')) {
@@ -838,22 +825,85 @@ Make the scoring difference clear - Paik is the generous one, Anh is the tough c
                 rankingsPlaceholder.className = 'glass-effect rounded-2xl p-8 text-center mt-8';
                 rankingsPlaceholder.innerHTML = `
                     <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-400 mb-4"></div>
-                    <p class="text-gray-300">Calculating final rankings based on scores...</p>
+                    <p class="text-gray-300">The judges are scoring all dishes...</p>
                 `;
                 document.getElementById('allJudgments').appendChild(rankingsPlaceholder);
 
-                // Extract scores from judgments
+                const apiKey = document.getElementById('apiKey').value.trim();
+
+                // Request scores from judges for all dishes
+                const dishesSummary = results.map(r => 
+                    `**${r.contestantName}**: "${r.dishName}"`
+                ).join('\n');
+
+                const scoringPrompt = {
+                    type: "text",
+                    text: `You are the judging panel from Culinary Class Wars (흑백요리사). You have provided detailed feedback on all dishes. Now you must assign numerical scores.
+
+Here are all the dishes:
+
+${dishesSummary}
+
+For EACH dish above, provide scores from both judges in this EXACT format:
+[Contestant Name]
+Paik Jong Won: X.X/10
+Anh Sung Jae: X.X/10
+
+SCORING GUIDELINES:
+**Paik Jong Won:**
+- MORE LENIENT and encouraging
+- Scores: 6.5-9.5/10 range, can go 5.5-10.0 for exceptional cases
+- Use whole numbers (6.0, 7.0, 8.0) or half points (6.5, 7.5, 8.5)
+- Show variance - not all dishes get the same score
+
+**Anh Sung Jae:**
+- MORE CRITICAL with higher standards
+- Scores: 4.5-7.5/10 range, gives 8.0+ only for truly exceptional work
+- Use whole numbers (5.0, 6.0, 7.0) or half points (5.5, 6.5, 7.5)  
+- Show variance - differentiate between dishes clearly
+
+${results.some(r => r.isMichelle) ? 'NOTE: Be slightly more lenient (add 0.5-1 point) for the birthday contestant. Maximum score is 10.0/10 - do not exceed this.' : ''}
+
+IMPORTANT: Provide ONLY the scores in the format above, no additional commentary.`
+                };
+
+                const response = await fetch('/api/judge', {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "x-api-key": apiKey
+                    },
+                    body: JSON.stringify({
+                        model: "claude-sonnet-4-20250514",
+                        max_tokens: 1500,
+                        messages: [{ role: "user", content: [scoringPrompt] }]
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to get scores');
+                }
+
+                const data = await response.json();
+                const scoringText = data.content.find(c => c.type === 'text')?.text || '';
+
+                // Parse scores from the response
                 const dishesWithScores = results.map(result => {
-                    const judgment = result.judgment;
+                    // Find scores for this contestant in the scoring response
+                    const contestantBlock = scoringText.split('\n\n').find(block => 
+                        block.includes(result.contestantName)
+                    );
                     
-                    // Extract Paik's score
-                    const paikMatch = judgment.match(/(\d+(?:\.\d+)?)\s*\/\s*10/);
-                    const paikScore = paikMatch ? parseFloat(paikMatch[1]) : 0;
+                    let paikScore = 0;
+                    let anhScore = 0;
                     
-                    // Extract Anh's score (find second occurrence)
-                    const allScores = judgment.match(/(\d+(?:\.\d+)?)\s*\/\s*10/g);
-                    const anhMatch = allScores && allScores.length > 1 ? allScores[1].match(/(\d+(?:\.\d+)?)/) : null;
-                    const anhScore = anhMatch ? parseFloat(anhMatch[1]) : 0;
+                    if (contestantBlock) {
+                        const paikMatch = contestantBlock.match(/Paik Jong Won:\s*(\d+(?:\.\d+)?)/i);
+                        const anhMatch = contestantBlock.match(/Anh Sung Jae:\s*(\d+(?:\.\d+)?)/i);
+                        
+                        paikScore = paikMatch ? parseFloat(paikMatch[1]) : 0;
+                        anhScore = anhMatch ? parseFloat(anhMatch[1]) : 0;
+                    }
                     
                     const averageScore = (paikScore + anhScore) / 2;
                     
@@ -869,8 +919,9 @@ Make the scoring difference clear - Paik is the generous one, Anh is the tough c
                 // Sort by average score (descending)
                 dishesWithScores.sort((a, b) => b.averageScore - a.averageScore);
 
-                // Get top 3
+                // Get top 3 and runners-up
                 const top3 = dishesWithScores.slice(0, 3);
+                const runnersUp = dishesWithScores.slice(3);
 
                 // Check if there are ties that need deliberation
                 const needsDeliberation = (
@@ -986,6 +1037,38 @@ Keep it under 100 words. Show their different perspectives but reach consensus o
                     `;
                 });
                 rankingsHTML += '</div>';
+
+                // Add runners-up section if there are any
+                if (runnersUp.length > 0) {
+                    rankingsHTML += `
+                        <div class="mt-8 pt-8 border-t border-gray-700">
+                            <h3 class="text-2xl font-bold text-gray-400 mb-6 text-center">Runners-Up</h3>
+                            <div class="space-y-3">
+                    `;
+                    
+                    runnersUp.forEach((dish, idx) => {
+                        rankingsHTML += `
+                            <div class="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex-1">
+                                        <p class="text-gray-400 font-bold text-lg mb-1">${dish.contestantName}</p>
+                                        <p class="text-gray-500 text-sm italic mb-2">"${dish.dishName}"</p>
+                                        <div class="flex gap-3 text-xs">
+                                            <span class="text-red-400">Paik: ${dish.paikScore}/10</span>
+                                            <span class="text-blue-400">Anh: ${dish.anhScore}/10</span>
+                                            <span class="text-yellow-400 font-bold">Avg: ${dish.averageScore.toFixed(1)}/10</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    rankingsHTML += `
+                            </div>
+                        </div>
+                    `;
+                }
 
                 // Add final rankings section
                 const rankingsSection = document.createElement('div');
