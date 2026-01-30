@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Culinary Class Wars - BJC Edition</title>
+    <title>Culinary Class Wars - Dinner Party Game</title>
     <link rel="icon" href="https://brand.netflix.com/favicon.ico"/>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -601,6 +601,9 @@ Make the scoring difference clear - Paik is the generous one, Anh is the tough c
                     </div>
                 `).join('');
 
+                // Now get final rankings
+                await getFinalRankings(results);
+
             } catch (error) {
                 document.getElementById('loadingState').classList.add('hidden');
                 
@@ -648,6 +651,116 @@ Make the scoring difference clear - Paik is the generous one, Anh is the tough c
             document.getElementById('submissionScreen').classList.remove('hidden');
             document.getElementById('resultsScreen').classList.add('hidden');
             window.scrollTo(0, 0);
+        }
+
+        async function getFinalRankings(results) {
+            try {
+                // Show loading indicator for rankings
+                const rankingsPlaceholder = document.createElement('div');
+                rankingsPlaceholder.id = 'rankingsLoading';
+                rankingsPlaceholder.className = 'glass-effect rounded-2xl p-8 text-center mt-8';
+                rankingsPlaceholder.innerHTML = `
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-400 mb-4"></div>
+                    <p class="text-gray-300">The judges are deliberating on the final rankings...</p>
+                `;
+                document.getElementById('allJudgments').appendChild(rankingsPlaceholder);
+
+                const apiKey = document.getElementById('apiKey').value.trim();
+
+                // Prepare summary of all dishes for ranking
+                const dishesSummary = results.map(r => 
+                    `**${r.contestantName}**: "${r.dishName}"`
+                ).join('\n');
+
+                const rankingPrompt = {
+                    type: "text",
+                    text: `You are the judging panel from Culinary Class Wars (흑백요리사). You have just finished judging all the dishes. Now you must discuss and agree on the TOP 3 DISHES.
+
+Here are all the dishes you judged:
+
+${dishesSummary}
+
+Based on your individual assessments, have a brief discussion between Paik Jong Won and Anh Sung Jae about the top 3 dishes. They should:
+1. Acknowledge if they disagree on certain dishes (stay true to their different standards)
+2. Find common ground on which 3 dishes deserve top spots
+3. Rank them as 1st, 2nd, and 3rd place
+
+Format your response as:
+- Brief discussion (3-4 lines of back-and-forth dialogue)
+- Final agreed ranking with contestant names and dish names
+
+Keep it under 150 words total. Make it feel like a natural judges' deliberation.`
+                };
+
+                const response = await fetch('/api/judge', {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "x-api-key": apiKey
+                    },
+                    body: JSON.stringify({
+                        model: "claude-sonnet-4-20250514",
+                        max_tokens: 1000,
+                        messages: [{ role: "user", content: [rankingPrompt] }]
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to get rankings');
+                }
+
+                const data = await response.json();
+                const ranking = data.content.find(c => c.type === 'text')?.text || 'Unable to get rankings';
+
+                // Remove loading indicator
+                document.getElementById('rankingsLoading').remove();
+
+                // Add final rankings section
+                const rankingsSection = document.createElement('div');
+                rankingsSection.className = 'glass-effect rounded-2xl p-8 mt-8 animate-fade-in border-4 border-yellow-500';
+                rankingsSection.innerHTML = `
+                    <div class="text-center mb-6">
+                        <h2 class="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-red-500 mb-2">
+                            🏆 FINAL RANKINGS 🏆
+                        </h2>
+                        <p class="text-gray-300 text-lg">The Judges' Top 3 Dishes</p>
+                    </div>
+                    <div class="bg-gray-800 rounded-xl p-6 prose prose-invert max-w-none">
+                        ${ranking.split('\n').map(line => {
+                            if (line.includes('1st') || line.includes('First') || line.includes('🥇')) {
+                                return `<p class="text-yellow-400 font-bold text-xl mb-2">${line}</p>`;
+                            } else if (line.includes('2nd') || line.includes('Second') || line.includes('🥈')) {
+                                return `<p class="text-gray-300 font-bold text-lg mb-2">${line}</p>`;
+                            } else if (line.includes('3rd') || line.includes('Third') || line.includes('🥉')) {
+                                return `<p class="text-orange-400 font-bold text-lg mb-2">${line}</p>`;
+                            } else if (line.trim()) {
+                                return `<p class="mb-2">${line}</p>`;
+                            }
+                            return '';
+                        }).join('')}
+                    </div>
+                `;
+                document.getElementById('allJudgments').appendChild(rankingsSection);
+
+                // Scroll to rankings
+                rankingsSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            } catch (error) {
+                console.error('Error getting rankings:', error);
+                // Remove loading indicator if it exists
+                const loadingEl = document.getElementById('rankingsLoading');
+                if (loadingEl) loadingEl.remove();
+                
+                // Show error message
+                const errorSection = document.createElement('div');
+                errorSection.className = 'glass-effect rounded-2xl p-8 mt-8 bg-red-900/20 border border-red-600';
+                errorSection.innerHTML = `
+                    <p class="text-red-400 text-center">
+                        Could not generate final rankings. Please check the individual scores above.
+                    </p>
+                `;
+                document.getElementById('allJudgments').appendChild(errorSection);
+            }
         }
     </script>
 </body>
