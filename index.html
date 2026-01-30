@@ -494,22 +494,23 @@ CRITICAL CONSTRAINTS:
 - MORE LENIENT and encouraging - finds positives even in flawed dishes
 - Folksy, down-to-earth, focuses on practical cooking and everyday appeal
 - Emphasizes flavor balance, proper seasoning, and "does it taste good?"
-- Often scores 7-9/10, rarely goes below 6 unless truly problematic
+- Scores with precision: use whole numbers (6.0, 7.0, 8.0) or half points (6.5, 7.5, 8.5) as appropriate
+- Range: Usually 6.5-9.5/10, can go as low as 5.5 for poor execution or as high as 10.0 for exceptional
 - Warm tone: "이건 괜찮은데?" (This is pretty good!), "맛있어요" (It's delicious)
-- Score: Typically 7-9/10
+- Show variance - not all dishes should get similar scores
 
 **Anh Sung Jae (안성재)** (80-100 words):
 - MORE CRITICAL and exacting with higher standards from fine dining background
 - Refined, technical, focuses on sophistication and precision
 - Emphasizes presentation, creativity, technique refinement, and modern execution
+- Scores with precision: use whole numbers (5.0, 6.0, 7.0) or half points (5.5, 6.5, 7.5) as appropriate
+- Range: Usually 4.5-7.5/10, gives 8.0+ only for truly exceptional work, can go as low as 4.0 for poor dishes
 - When giving COMPLIMENTS, he specifically praises: "perfect doneness on the protein", "even cooking throughout", "precise vegetable preparation"
 - When critiquing, he focuses on creativity, plating, flavor complexity, or refinement - NOT doneness issues
-- Scores more harshly - often 5-7/10, gives 8+ only for exceptional work
 - Direct, professional tone with constructive criticism
-- Points out what's missing or could be elevated
-- Score: Typically 5-7/10
+- Show variance - differentiate between dishes clearly with different scores
 
-Make the scoring difference clear - Paik is the generous one, Anh is the tough critic who notices technical execution details (especially when praising them).`
+Make the scoring difference clear - Paik is the generous one, Anh is the tough critic who notices technical execution details (especially when praising them). VARY THE SCORES - some dishes should be better than others!`
                         }
                     ];
 
@@ -601,8 +602,19 @@ Make the scoring difference clear - Paik is the generous one, Anh is the tough c
                     </div>
                 `).join('');
 
-                // Now get final rankings
-                await getFinalRankings(results);
+                // Add "Reveal Final Rankings" button
+                const rankingsButtonContainer = document.createElement('div');
+                rankingsButtonContainer.className = 'text-center mt-8';
+                rankingsButtonContainer.innerHTML = `
+                    <button onclick="revealFinalRankings()" 
+                            class="px-12 py-4 bg-gradient-to-r from-yellow-600 to-red-600 hover:from-yellow-700 hover:to-red-700 text-white font-black text-xl rounded-lg transition-all transform hover:scale-105 shadow-lg">
+                        🏆 Reveal Final Rankings
+                    </button>
+                `;
+                resultsContainer.appendChild(rankingsButtonContainer);
+                
+                // Store results globally for ranking function
+                window.judgmentResults = results;
 
             } catch (error) {
                 document.getElementById('loadingState').classList.add('hidden');
@@ -653,6 +665,13 @@ Make the scoring difference clear - Paik is the generous one, Anh is the tough c
             window.scrollTo(0, 0);
         }
 
+        async function revealFinalRankings() {
+            // Hide the button
+            event.target.parentElement.remove();
+            
+            await getFinalRankings(window.judgmentResults);
+        }
+
         async function getFinalRankings(results) {
             try {
                 // Show loading indicator for rankings
@@ -661,85 +680,154 @@ Make the scoring difference clear - Paik is the generous one, Anh is the tough c
                 rankingsPlaceholder.className = 'glass-effect rounded-2xl p-8 text-center mt-8';
                 rankingsPlaceholder.innerHTML = `
                     <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-400 mb-4"></div>
-                    <p class="text-gray-300">The judges are deliberating on the final rankings...</p>
+                    <p class="text-gray-300">Calculating final rankings based on scores...</p>
                 `;
                 document.getElementById('allJudgments').appendChild(rankingsPlaceholder);
 
-                const apiKey = document.getElementById('apiKey').value.trim();
-
-                // Prepare summary of all dishes for ranking
-                const dishesSummary = results.map(r => 
-                    `**${r.contestantName}**: "${r.dishName}"`
-                ).join('\n');
-
-                const rankingPrompt = {
-                    type: "text",
-                    text: `You are the judging panel from Culinary Class Wars (흑백요리사). You have just finished judging all the dishes. Now you must discuss and agree on the TOP 3 DISHES.
-
-Here are all the dishes you judged:
-
-${dishesSummary}
-
-Based on your individual assessments, have a brief discussion between Paik Jong Won and Anh Sung Jae about the top 3 dishes. They should:
-1. Acknowledge if they disagree on certain dishes (stay true to their different standards)
-2. Find common ground on which 3 dishes deserve top spots
-3. Rank them as 1st, 2nd, and 3rd place
-
-Format your response as:
-- Brief discussion (3-4 lines of back-and-forth dialogue)
-- Final agreed ranking with contestant names and dish names
-
-Keep it under 150 words total. Make it feel like a natural judges' deliberation.`
-                };
-
-                const response = await fetch('/api/judge', {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "x-api-key": apiKey
-                    },
-                    body: JSON.stringify({
-                        model: "claude-sonnet-4-20250514",
-                        max_tokens: 1000,
-                        messages: [{ role: "user", content: [rankingPrompt] }]
-                    })
+                // Extract scores from judgments
+                const dishesWithScores = results.map(result => {
+                    const judgment = result.judgment;
+                    
+                    // Extract Paik's score
+                    const paikMatch = judgment.match(/(\d+(?:\.\d+)?)\s*\/\s*10/);
+                    const paikScore = paikMatch ? parseFloat(paikMatch[1]) : 0;
+                    
+                    // Extract Anh's score (find second occurrence)
+                    const allScores = judgment.match(/(\d+(?:\.\d+)?)\s*\/\s*10/g);
+                    const anhMatch = allScores && allScores.length > 1 ? allScores[1].match(/(\d+(?:\.\d+)?)/) : null;
+                    const anhScore = anhMatch ? parseFloat(anhMatch[1]) : 0;
+                    
+                    const averageScore = (paikScore + anhScore) / 2;
+                    
+                    return {
+                        contestantName: result.contestantName,
+                        dishName: result.dishName,
+                        paikScore,
+                        anhScore,
+                        averageScore
+                    };
                 });
 
-                if (!response.ok) {
-                    throw new Error('Failed to get rankings');
-                }
+                // Sort by average score (descending)
+                dishesWithScores.sort((a, b) => b.averageScore - a.averageScore);
 
-                const data = await response.json();
-                const ranking = data.content.find(c => c.type === 'text')?.text || 'Unable to get rankings';
+                // Get top 3
+                const top3 = dishesWithScores.slice(0, 3);
+
+                // Check if there are ties that need deliberation
+                const needsDeliberation = (
+                    top3.length >= 2 && Math.abs(top3[0].averageScore - top3[1].averageScore) < 0.01
+                ) || (
+                    top3.length >= 3 && Math.abs(top3[1].averageScore - top3[2].averageScore) < 0.01
+                );
+
+                let deliberationText = '';
+
+                if (needsDeliberation) {
+                    // Call API for deliberation on ties
+                    rankingsPlaceholder.querySelector('p').textContent = 'The judges are deliberating on tied dishes...';
+                    
+                    const apiKey = document.getElementById('apiKey').value.trim();
+
+                    const tiedDishes = top3.map(d => 
+                        `**${d.contestantName}** ("${d.dishName}"): Paik ${d.paikScore}/10, Anh ${d.anhScore}/10, Average ${d.averageScore.toFixed(1)}/10`
+                    ).join('\n');
+
+                    const deliberationPrompt = {
+                        type: "text",
+                        text: `You are the judging panel from Culinary Class Wars (흑백요리사). The top 3 dishes have been determined by scores, but some have TIED scores. You need to discuss the tiebreakers.
+
+Here are the top 3 dishes with their scores:
+
+${tiedDishes}
+
+Have a brief back-and-forth discussion (3-4 lines) between Paik Jong Won and Anh Sung Jae about breaking the ties. Consider factors beyond the numerical scores:
+- Creativity and innovation
+- Technical difficulty
+- Ingredient utilization
+- Overall impression
+
+Keep it under 100 words. Show their different perspectives but reach consensus on the final order.`
+                    };
+
+                    const response = await fetch('/api/judge', {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "x-api-key": apiKey
+                        },
+                        body: JSON.stringify({
+                            model: "claude-sonnet-4-20250514",
+                            max_tokens: 800,
+                            messages: [{ role: "user", content: [deliberationPrompt] }]
+                        })
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        deliberationText = data.content.find(c => c.type === 'text')?.text || '';
+                    }
+                }
 
                 // Remove loading indicator
                 document.getElementById('rankingsLoading').remove();
 
-                // Add final rankings section
-                const rankingsSection = document.createElement('div');
-                rankingsSection.className = 'glass-effect rounded-2xl p-8 mt-8 animate-fade-in border-4 border-yellow-500';
-                rankingsSection.innerHTML = `
+                // Build rankings display
+                let rankingsHTML = `
                     <div class="text-center mb-6">
                         <h2 class="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-red-500 mb-2">
                             🏆 FINAL RANKINGS 🏆
                         </h2>
-                        <p class="text-gray-300 text-lg">The Judges' Top 3 Dishes</p>
-                    </div>
-                    <div class="bg-gray-800 rounded-xl p-6 prose prose-invert max-w-none">
-                        ${ranking.split('\n').map(line => {
-                            if (line.includes('1st') || line.includes('First') || line.includes('🥇')) {
-                                return `<p class="text-yellow-400 font-bold text-xl mb-2">${line}</p>`;
-                            } else if (line.includes('2nd') || line.includes('Second') || line.includes('🥈')) {
-                                return `<p class="text-gray-300 font-bold text-lg mb-2">${line}</p>`;
-                            } else if (line.includes('3rd') || line.includes('Third') || line.includes('🥉')) {
-                                return `<p class="text-orange-400 font-bold text-lg mb-2">${line}</p>`;
-                            } else if (line.trim()) {
-                                return `<p class="mb-2">${line}</p>`;
-                            }
-                            return '';
-                        }).join('')}
+                        <p class="text-gray-300 text-lg">Based on judges' scores</p>
                     </div>
                 `;
+
+                // Add deliberation if there was one
+                if (deliberationText) {
+                    rankingsHTML += `
+                        <div class="bg-gray-900/50 rounded-xl p-6 mb-6 border border-yellow-600/30">
+                            <h3 class="text-yellow-400 font-bold text-lg mb-3">Judges' Deliberation on Tied Scores:</h3>
+                            <div class="prose prose-invert max-w-none text-sm">
+                                ${deliberationText.split('\n').map(line => 
+                                    line.trim() ? `<p class="mb-2">${line}</p>` : ''
+                                ).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Add rankings
+                const medals = ['🥇', '🥈', '🥉'];
+                const colors = ['text-yellow-400', 'text-gray-300', 'text-orange-400'];
+                const positions = ['1st Place', '2nd Place', '3rd Place'];
+
+                rankingsHTML += '<div class="space-y-4">';
+                top3.forEach((dish, idx) => {
+                    rankingsHTML += `
+                        <div class="bg-gray-800 rounded-xl p-6 border-2 ${idx === 0 ? 'border-yellow-500' : 'border-gray-700'}">
+                            <div class="flex items-start justify-between">
+                                <div class="flex-1">
+                                    <p class="${colors[idx]} font-black text-2xl mb-2">
+                                        ${medals[idx]} ${positions[idx]}
+                                    </p>
+                                    <p class="text-white font-bold text-xl mb-1">${dish.contestantName}</p>
+                                    <p class="text-gray-400 italic mb-3">"${dish.dishName}"</p>
+                                    <div class="flex gap-4 text-sm">
+                                        <span class="text-red-400">Paik: ${dish.paikScore}/10</span>
+                                        <span class="text-blue-400">Anh: ${dish.anhScore}/10</span>
+                                        <span class="text-yellow-400 font-bold">Average: ${dish.averageScore.toFixed(1)}/10</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                rankingsHTML += '</div>';
+
+                // Add final rankings section
+                const rankingsSection = document.createElement('div');
+                rankingsSection.className = 'glass-effect rounded-2xl p-8 mt-8 animate-fade-in border-4 border-yellow-500';
+                rankingsSection.innerHTML = rankingsHTML;
                 document.getElementById('allJudgments').appendChild(rankingsSection);
 
                 // Scroll to rankings
