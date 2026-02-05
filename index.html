@@ -39,16 +39,19 @@
     </style>
 </head>
 <body class="min-h-screen text-white" style="background: linear-gradient(180deg, #000000 0%, #1a0a0a 50%, #000000 100%);">
-    <!-- Header Bar with Black Background -->
-    <div class="w-full bg-black py-6 relative z-20 border-b border-gray-800">
+    <!-- Header Bar with Black Background - FIXED AT TOP -->
+    <div class="fixed top-0 left-0 right-0 w-full bg-black py-4 z-20 border-b border-gray-800">
         <div class="container mx-auto px-4 text-center">
-            <img src="/logo.webp" alt="흑백요리사" class="mx-auto h-16 md:h-20 mb-3">
-            <p class="text-lg md:text-xl text-white font-semibold tracking-widest">DINNER PARTY CHALLENGE</p>
+            <img src="/logo.webp" alt="흑백요리사" class="mx-auto h-12 md:h-14 mb-2">
+            <p class="text-sm md:text-base text-white font-semibold tracking-widest">DINNER PARTY CHALLENGE</p>
         </div>
     </div>
     
+    <!-- Spacer to account for fixed header -->
+    <div style="height: 100px;"></div>
+    
     <!-- Main Background Image (First Screen Only) -->
-    <div class="fixed top-0 left-0 right-0 z-0" style="margin-top: 140px; height: 100vh;">
+    <div class="fixed top-0 left-0 right-0 z-0" style="margin-top: 100px; height: 100vh;">
         <img src="/background.webp" alt="Culinary Class Wars" class="w-full h-full object-cover opacity-90">
         <div class="absolute inset-0 bg-gradient-to-b from-black/40 via-black/60 to-black"></div>
     </div>
